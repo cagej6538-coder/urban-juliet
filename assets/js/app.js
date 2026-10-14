@@ -1,6 +1,8 @@
 /* URBAN JULIET storefront starter. Sample products/images/prices are placeholders until approved by the client. */
+
 const SUPABASE_URL = 'https://vbxjntqhjavttqivstir.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_c2pQQhJw_FfsYwNsqL3E7A_rhTZ8UQ0'; // Public publishable/anon key only; never use service_role/secret keys.
+const SUPABASE_ANON_KEY = 'sb_publishable_c2pQQhJw_FfsYwNsqL3E7A_rhTZ8UQ0';
+ // Public publishable/anon key only; never use service_role/secret keys.
 const sampleProducts = [
  {id:'uj-001',name:'The Everyday Tee',category:'Tops',price:18500,tag:'Bestseller',image:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=800&q=85'},
  {id:'uj-002',name:'Soft Structure Shirt',category:'Tops',price:26500,tag:'New',image:'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=800&q=85'},

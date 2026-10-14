@@ -1,7 +1,7 @@
 /* URBAN JULIET storefront starter. Sample products/images/prices are placeholders until approved by the client. */
-const SUPABASE_URL = ''; // Add your Supabase project URL only after creating the project.
-const SUPABASE_ANON_KEY = ''; // Public anon key is okay in frontend; never put service_role or Paystack secret here.
-const products = [
+const SUPABASE_URL = 'https://example-project.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_example'; // Public publishable/anon key only; never use service_role/secret keys.
+const sampleProducts = [
  {id:'uj-001',name:'The Everyday Tee',category:'Tops',price:18500,tag:'Bestseller',image:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=800&q=85'},
  {id:'uj-002',name:'Soft Structure Shirt',category:'Tops',price:26500,tag:'New',image:'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=800&q=85'},
  {id:'uj-003',name:'The Daily Trouser',category:'Bottoms',price:32000,tag:'',image:'https://images.unsplash.com/photo-1506629905607-d9a9d8a1c5c0?auto=format&fit=crop&w=800&q=85'},
@@ -11,14 +11,33 @@ const products = [
  {id:'uj-007',name:'Weekend Overshirt',category:'Layers',price:38500,tag:'',image:'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=800&q=85'},
  {id:'uj-008',name:'Everyday Short',category:'Bottoms',price:19500,tag:'',image:'https://images.unsplash.com/photo-1591195853828-11db59a44f6b?auto=format&fit=crop&w=800&q=85'}
 ];
+let products = [...sampleProducts];
 const state={filter:'All',search:'',sort:'featured',cart:[]};
 const $=s=>document.querySelector(s); const money=n=>new Intl.NumberFormat('en-NG',{style:'currency',currency:'NGN',maximumFractionDigits:0}).format(n);
 function visibleProducts(){let list=products.filter(p=>(state.filter==='All'||p.category===state.filter)&&p.name.toLowerCase().includes(state.search.toLowerCase()));if(state.sort==='low')list.sort((a,b)=>a.price-b.price);if(state.sort==='high')list.sort((a,b)=>b.price-a.price);return list;}
 function renderProducts(){const grid=$('#productGrid');const list=visibleProducts();grid.innerHTML=list.length?list.map((p,i)=>`<article class="product-card" style="animation-delay:${Math.min(i,8)*45}ms"><div class="product-photo"><img loading="lazy" src="${p.image}" alt="${p.name}" onerror="this.style.opacity='.2'"><span class="product-tag" ${p.tag?'':'hidden'}>${p.tag}</span><button class="quick-add" data-add="${p.id}">Add to bag <span>＋</span></button></div><div class="product-info"><div><h3>${p.name}</h3><span class="product-category">${p.category}</span></div><span class="product-price">${money(p.price)}</span></div></article>`).join(''):'<p>No pieces found. Try another search.</p>';grid.querySelectorAll('[data-add]').forEach(b=>b.addEventListener('click',()=>addToCart(b.dataset.add)));}
+async function loadCatalogueFromSupabase(){
+  const configured = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('PASTE_YOUR_') && SUPABASE_ANON_KEY && !SUPABASE_ANON_KEY.includes('PASTE_YOUR_');
+  if(!configured || !window.supabase?.createClient) return;
+  try {
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const { data, error } = await client.from('products').select('id,slug,name,description,category,price_kobo,image_url,is_active,stock_quantity').eq('is_active', true).order('created_at', { ascending: false });
+    if(error) throw error;
+    if(Array.isArray(data) && data.length){
+      products = data.map(p => ({ id:p.id, name:p.name, category:p.category || 'Other', price:Math.round(Number(p.price_kobo || 0)/100), tag:'', image:p.image_url || sampleProducts[0].image, stock:Number(p.stock_quantity ?? 0) }));
+      renderProducts();
+      renderCart();
+      const note = document.querySelector('#productSourceNote');
+      if(note) note.textContent = 'Showing products from the URBAN JULIET catalogue.';
+    }
+  } catch(err) {
+    console.warn('Supabase catalogue could not be loaded; showing preview products instead.', err);
+  }
+}
 function addToCart(id){const found=state.cart.find(x=>x.id===id);if(found)found.qty++;else state.cart.push({id,qty:1});renderCart();openCart();}
 function cartCount(){return state.cart.reduce((n,x)=>n+x.qty,0)}
 function renderCart(){const count=cartCount();$('#bagCount').textContent=count;$('#drawerCount').textContent=`(${count})`;const items=$('#cartItems');items.innerHTML=state.cart.length?state.cart.map(item=>{const p=products.find(x=>x.id===item.id);return `<div class="cart-row"><img src="${p.image}" alt=""><div><h3>${p.name}</h3><p>${money(p.price)}</p><div class="qty-controls"><button data-qty="${p.id}" data-delta="-1" aria-label="Remove one">−</button><span>${item.qty}</span><button data-qty="${p.id}" data-delta="1" aria-label="Add one">+</button></div></div><button class="remove-item" data-remove="${p.id}">Remove</button></div>`}).join(''):'<p class="cart-empty">Your bag is waiting for something good.</p>';items.querySelectorAll('[data-qty]').forEach(b=>b.addEventListener('click',()=>{const item=state.cart.find(x=>x.id===b.dataset.qty);item.qty+=Number(b.dataset.delta);if(item.qty<=0)state.cart=state.cart.filter(x=>x.id!==item.id);renderCart()}));items.querySelectorAll('[data-remove]').forEach(b=>b.addEventListener('click',()=>{state.cart=state.cart.filter(x=>x.id!==b.dataset.remove);renderCart()}));$('#cartTotal').textContent=money(state.cart.reduce((sum,item)=>sum+products.find(p=>p.id===item.id).price*item.qty,0));}
 function openCart(){$('#cartDrawer').classList.add('open');$('#cartDrawer').setAttribute('aria-hidden','false');$('#drawerBackdrop').classList.add('open');document.body.style.overflow='hidden'}function closeCart(){$('#cartDrawer').classList.remove('open');$('#cartDrawer').setAttribute('aria-hidden','true');$('#drawerBackdrop').classList.remove('open');document.body.style.overflow=''}
 document.querySelectorAll('.filter').forEach(b=>b.addEventListener('click',()=>{state.filter=b.dataset.filter;document.querySelectorAll('.filter').forEach(x=>x.classList.toggle('active',x===b));renderProducts()}));$('#sortSelect').addEventListener('change',e=>{state.sort=e.target.value;renderProducts()});$('#bagToggle').addEventListener('click',openCart);$('#closeCart').addEventListener('click',closeCart);$('#drawerBackdrop').addEventListener('click',closeCart);$('#searchToggle').addEventListener('click',()=>{$('#searchBar').classList.toggle('hidden');if(!$('#searchBar').classList.contains('hidden'))$('#searchInput').focus()});$('#clearSearch').addEventListener('click',()=>{$('#searchInput').value='';state.search='';renderProducts()});$('#searchInput').addEventListener('input',e=>{state.search=e.target.value;renderProducts()});$('#menuToggle').addEventListener('click',()=>{const nav=document.querySelector('.desktop-nav');if(nav.style.display==='flex'){nav.style.display='';return}nav.style.display='flex';nav.style.position='absolute';nav.style.top='68px';nav.style.left='0';nav.style.right='0';nav.style.padding='22px';nav.style.background='white';nav.style.flexDirection='column';nav.style.borderBottom='1px solid var(--line)';nav.style.zIndex='30'});document.querySelectorAll('.desktop-nav a').forEach(a=>a.addEventListener('click',()=>{if(innerWidth<=640)document.querySelector('.desktop-nav').style.display='none'}));
 $('#newsletterForm').addEventListener('submit',async e=>{e.preventDefault();const email=$('#newsletterEmail').value.trim();if(SUPABASE_URL&&SUPABASE_ANON_KEY){try{const client=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);const {error}=await client.from('newsletter_subscribers').insert({email});if(error)throw error;$('#newsletterMessage').textContent='You’re on the list — thank you.';e.target.reset()}catch(err){$('#newsletterMessage').textContent='We couldn’t save that just now. Please try again later.'}}else{$('#newsletterMessage').textContent='Thanks! Newsletter sign-up will activate after the store backend is connected.';e.target.reset()}});
-$('#checkoutButton').addEventListener('click',()=>{$('#checkoutMessage').textContent=state.cart.length?'Checkout is not connected yet. We’ll connect Supabase and Paystack and test payment verification before launch.':'Add an item to your bag first.'});$('#year').textContent=new Date().getFullYear();renderProducts();renderCart();
+$('#checkoutButton').addEventListener('click',()=>{$('#checkoutMessage').textContent=state.cart.length?'Checkout is not connected yet. We’ll connect Supabase and Paystack and test payment verification before launch.':'Add an item to your bag first.'});$('#year').textContent=new Date().getFullYear();renderProducts();renderCart();loadCatalogueFromSupabase();
